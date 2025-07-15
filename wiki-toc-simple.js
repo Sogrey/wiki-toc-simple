@@ -16,7 +16,7 @@
  * - 提供API接口供外部调用
  * 
  * 作者：Sogrey
- * 版本：1.0.0
+ * 版本：1.0.1
  * 兼容性：现代浏览器（Chrome、Firefox、Safari、Edge）
  */
 
@@ -188,6 +188,145 @@
     }
     
     /**
+     * 绑定滚动监听事件，实现目录高亮
+     * 
+     * 功能：
+     * - 监听页面滚动事件
+     * - 计算当前可见的标题
+     * - 高亮对应的目录项
+     * - 使用节流优化性能
+     */
+    function bindScrollEvents() {
+        let ticking = false;
+        let headings = [];
+        let tocLinks = [];
+        
+        // 获取所有标题和对应的目录链接
+        function updateElements() {
+            const content = document.querySelector(config.contentSelector);
+            if (content) {
+                headings = Array.from(content.querySelectorAll('h1, h2, h3, h4, h5, h6'));
+                tocLinks = Array.from(document.querySelectorAll('.wiki-toc-link'));
+            }
+        }
+        
+        // 初始化元素列表
+        updateElements();
+        
+        // 移除所有高亮
+        function clearHighlights() {
+            tocLinks.forEach(link => {
+                link.classList.remove('wiki-toc-active');
+            });
+        }
+        
+        // 高亮指定目录项
+        function highlightTocItem(targetId) {
+            clearHighlights();
+            const activeLink = document.querySelector(`.wiki-toc-link[href="#${targetId}"]`);
+            if (activeLink) {
+                activeLink.classList.add('wiki-toc-active');
+                
+                // 检查目录项是否在可视区域内，如果不在则自动滚动
+                scrollTocToVisible(activeLink);
+            }
+        }
+        
+        // 计算当前可见的标题
+        function getCurrentHeading() {
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            const offset = config.scrollOffset + 10; // 添加一些容差
+            
+            // 从后往前查找，找到第一个在视口上方的标题
+            for (let i = headings.length - 1; i >= 0; i--) {
+                const heading = headings[i];
+                const headingTop = heading.offsetTop;
+                
+                if (headingTop <= scrollTop + offset) {
+                    return heading.id;
+                }
+            }
+            
+            // 如果没有找到，返回第一个标题
+            return headings.length > 0 ? headings[0].id : null;
+        }
+        
+        // 滚动处理函数
+        function handleScroll() {
+            if (!ticking) {
+                requestAnimationFrame(() => {
+                    const currentId = getCurrentHeading();
+                    if (currentId) {
+                        highlightTocItem(currentId);
+                    }
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        }
+        
+        // 绑定滚动事件
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        
+        // 初始高亮
+        setTimeout(() => {
+            const currentId = getCurrentHeading();
+            if (currentId) {
+                highlightTocItem(currentId);
+            }
+        }, 100);
+        
+        /**
+         * 将目录项滚动到可视区域
+         * 
+         * @param {HTMLElement} activeLink - 当前活跃的目录链接元素
+         */
+        function scrollTocToVisible(activeLink) {
+            const tocContainer = document.querySelector('.wiki-toc-simple');
+            if (!tocContainer) return;
+            
+            // 获取目录容器的边界信息
+            const containerRect = tocContainer.getBoundingClientRect();
+            const linkRect = activeLink.getBoundingClientRect();
+            
+            // 计算目录项相对于容器的位置
+            const linkTop = linkRect.top - containerRect.top;
+            const linkBottom = linkRect.bottom - containerRect.top;
+            
+            // 获取容器的可视区域高度
+            const containerHeight = containerRect.height;
+            
+            // 检查目录项是否在可视区域内
+            const isVisible = linkTop >= 0 && linkBottom <= containerHeight;
+            
+            if (!isVisible) {
+                // 计算滚动位置
+                let scrollTop;
+                
+                if (linkTop < 0) {
+                    // 目录项在可视区域上方，滚动到顶部
+                    scrollTop = tocContainer.scrollTop + linkTop - 10; // 留出10px边距
+                } else {
+                    // 目录项在可视区域下方，滚动到底部
+                    scrollTop = tocContainer.scrollTop + linkBottom - containerHeight + 10; // 留出10px边距
+                }
+                
+                // 确保滚动位置在有效范围内
+                scrollTop = Math.max(0, Math.min(scrollTop, tocContainer.scrollHeight - containerHeight));
+                
+                // 平滑滚动到目标位置
+                tocContainer.scrollTo({
+                    top: scrollTop,
+                    behavior: 'smooth'
+                });
+            }
+        }
+        
+        // 暴露更新函数，供外部调用
+        window.updateTocElements = updateElements;
+    }
+    
+    /**
      * 将生成的目录插入到页面中
      * 
      * @param {string} tocHTML - 生成的目录HTML字符串
@@ -251,6 +390,9 @@
                 }
             });
         });
+        
+        // 绑定滚动监听事件，实现目录高亮
+        bindScrollEvents();
     }
     
     /**
@@ -360,6 +502,21 @@
                 color: white;
             }
             
+            /* 当前活跃目录项的高亮样式 */
+            .wiki-toc-link.wiki-toc-active {
+                background-color: rgba(0, 123, 255, 0.3) !important;
+                color: #007bff !important;
+                border-left: 3px solid #007bff;
+                padding-left: 5px;
+            }
+            
+            /* 一级目录活跃状态特殊样式 */
+            .wiki-toc-item[data-level="1"] .wiki-toc-link.wiki-toc-active {
+                background-color: rgba(0, 123, 255, 0.4) !important;
+                color: #007bff !important;
+                font-weight: bold;
+            }
+            
             @media (max-width: 768px) {
                 .wiki-toc-simple {
                     position: static;
@@ -402,11 +559,18 @@
      * - refresh(): 重新生成目录
      * - remove(): 移除目录
      * - config: 配置对象（可修改）
+     * - updateElements(): 更新标题和目录元素列表（用于动态内容）
      */
     window.wikiTOCSimple = {
+        version: '1.0.1',
         refresh: generateTOC,
         remove: removeExistingTOC,
-        config: config
+        config: config,
+        updateElements: () => {
+            if (window.updateTocElements) {
+                window.updateTocElements();
+            }
+        }
     };
     
 })(); 
