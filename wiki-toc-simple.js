@@ -15,7 +15,7 @@
  * - 自定义滚动条样式
  * - 提供API接口供外部调用
  * 
- * 作者：AI助手
+ * 作者：Sogrey
  * 版本：1.0.0
  * 兼容性：现代浏览器（Chrome、Firefox、Safari、Edge）
  */
