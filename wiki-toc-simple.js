@@ -16,7 +16,7 @@
  * - 提供API接口供外部调用
  * 
  * 作者：Sogrey
- * 版本：1.0.1
+ * 版本：1.0.2
  * 兼容性：现代浏览器（Chrome、Firefox、Safari、Edge）
  */
 
@@ -88,8 +88,14 @@
             return;
         }
         
-        // 查找所有标题元素（h1-h6）
-        const headings = content.querySelectorAll('h1, h2, h3, h4, h5, h6');
+        // 查找所有标题元素（h1-h6），排除 .tabset 内部的标题
+        const allHeadings = content.querySelectorAll('h1, h2, h3, h4, h5, h6');
+        const headings = Array.from(allHeadings).filter(heading => {
+            // 检查标题是否在 .tabset 元素内部
+            const isInTabset = heading.closest('.tabset');
+            return !isInTabset; // 返回不在 .tabset 内的标题
+        });
+        
         if (headings.length === 0) {
             console.log('未找到标题元素，无法生成目录');
             return;
@@ -205,7 +211,13 @@
         function updateElements() {
             const content = document.querySelector(config.contentSelector);
             if (content) {
-                headings = Array.from(content.querySelectorAll('h1, h2, h3, h4, h5, h6'));
+                // 查找所有标题，排除 .tabset 内部的标题
+                const allHeadings = content.querySelectorAll('h1, h2, h3, h4, h5, h6');
+                headings = Array.from(allHeadings).filter(heading => {
+                    // 检查标题是否在 .tabset 元素内部
+                    const isInTabset = heading.closest('.tabset');
+                    return !isInTabset; // 返回不在 .tabset 内的标题
+                });
                 tocLinks = Array.from(document.querySelectorAll('.wiki-toc-link'));
             }
         }
@@ -562,7 +574,7 @@
      * - updateElements(): 更新标题和目录元素列表（用于动态内容）
      */
     window.wikiTOCSimple = {
-        version: '1.0.1',
+        version: '1.0.2',
         refresh: generateTOC,
         remove: removeExistingTOC,
         config: config,
